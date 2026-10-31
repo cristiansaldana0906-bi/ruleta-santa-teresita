@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>La ruleta de Santa Teresita</title>
+<style>
+:root {
+ --site-primary:#7b3f2b; --site-on-primary:#ffffff;
+ --site-secondary:#f0c96b; --site-on-secondary:#422515;
+ --site-background:#fff8ec; --site-on-background:#38251d;
+ --site-font-body:"Trebuchet MS",Arial,sans-serif;
+ --site-font-heading:Georgia,"Times New Roman",serif;
+ --site-heading-scale:1; --site-spacing-scale:1; --site-radius-scale:1;
+ --site-decoration-opacity:1;
+}
+*{box-sizing:border-box}
+body{margin:0;font-family:var(--site-font-body);color:#38204f;background:linear-gradient(135deg,#fff0f6,#fff9d9 48%,#e4f7ff)}
+#app{min-height:100vh;width:100%;border-radius:0;background:transparent;color:#38204f;overflow:hidden}
+header{background:linear-gradient(110deg,#7136a8,#d94391 55%,#f08a35);color:#fff;text-align:center;padding:30px 16px;box-shadow:0 5px 18px #8d4b9b35}
+h1{font:bold calc(2.2rem * var(--site-heading-scale)) var(--site-font-heading);margin:0 0 8px}
+header p{margin:0}
+header:after{content:"🌸  ✨  🌹  ✨  🌸";display:block;color:#fff5a8;letter-spacing:7px;margin-top:12px;opacity:1;font-size:1.2rem}
+main{max-width:1050px;margin:auto;padding:24px 18px 35px}
+.intro{text-align:center;line-height:1.5;margin-bottom:20px}
+.game{display:grid;grid-template-columns:minmax(260px,1fr) minmax(260px,.9fr);gap:24px;align-items:center}
+.panel{background:#ffffff;border:3px solid #f3b7d4;border-radius:calc(24px * var(--site-radius-scale));padding:20px;text-align:center;box-shadow:0 10px 28px #743a8b20}
+.wheel-wrap{width:min(100%,390px);aspect-ratio:1;margin:auto;position:relative}
+canvas{width:100%;height:100%;display:block}
+.pointer{position:absolute;z-index:2;top:-7px;left:50%;transform:translateX(-50%);width:0;height:0;border-left:19px solid transparent;border-right:19px solid transparent;border-top:38px solid #ff3e83;filter:drop-shadow(0 2px 2px #55204b55)}
+.center{position:absolute;inset:39%;border-radius:50%;background:#fff3a8;border:6px solid #ff8b38;display:grid;place-items:center;color:#7136a8;font:bold 1.15rem Georgia;pointer-events:none}
+button{margin-top:18px;border:0;border-radius:999px;background:linear-gradient(100deg,#7136a8,#e33d91);color:white;padding:16px 30px;font:bold 1.1rem var(--site-font-body);cursor:pointer;box-shadow:0 5px 0 #55267b;transition:transform .15s}
+button:hover{transform:translateY(-2px)}
+button:disabled{opacity:.55;cursor:wait}
+.hint,.small{font-size:1rem;color:#684b78;opacity:1;font-weight:600}
+.result{min-height:330px;display:flex;flex-direction:column;justify-content:center}
+.icon{font-size:3.2rem}
+.eyebrow{text-transform:uppercase;letter-spacing:2px;font-size:.9rem;color:#9a3d9c;font-weight:900}
+#kind{font:bold calc(2.5rem * var(--site-heading-scale)) Georgia;margin:9px 0 14px;color:#7136a8;text-shadow:1px 2px #f7c6e3}
+#prompt{font-size:1.35rem;line-height:1.55;min-height:110px;display:grid;place-items:center;color:#38204f;font-weight:700;padding:8px}
+kbd{background:#fff0a8;color:#542b76;border:2px solid #f5a13c;border-radius:8px;padding:3px 9px;font-weight:900}
+footer{text-align:center;padding:8px 16px 25px;color:#7136a8;font-weight:700;font-size:.95rem}
+@media(max-width:720px){.game{grid-template-columns:1fr}.wheel-wrap{width:min(85vw,340px)}.result{min-height:270px}h1{font-size:calc(1.8rem * var(--site-heading-scale))}}
+</style>
+</head>
+<body>
+<div id="app">
+<header><h1>La ruleta de Santa Teresita</h1><p>¡Gira, descubre y participa!</p></header>
+<main>
+<div class="intro">
+<p>Presiona <kbd>ESPACIO</kbd> o toca el botón para girar la ruleta.</p>
+<p>Cuando se detenga, te tocará una <strong>pregunta</strong> o un <strong>reto</strong>.</p>
+</div>
+<section class="game">
+<div class="panel">
+<div class="wheel-wrap"><div class="pointer"></div><canvas id="wheel" width="700" height="700"></canvas><div class="center">GIRA</div></div>
+<button id="spin">✦ Girar ruleta ✦</button>
+<p class="hint">También puedes usar la barra espaciadora.</p>
+<p class="hint" id="soundStatus">🔊 Los efectos de sonido están activados.</p>
+</div>
+<div class="panel result" aria-live="polite">
+<div class="icon" id="icon">🌹</div><div class="eyebrow">Tu resultado</div>
+<div id="kind">¿Pregunta o reto?</div>
+<div id="prompt">¡Que comience el juego! Gira la ruleta para descubrir qué te toca.</div>
+<p class="small" id="extra">Participa con respeto y diviértete aprendiendo.</p>
+</div>
+</section>
+</main>
+<footer>🌹 Inspirado en Santa Teresita del Niño Jesús 🌹</footer>
+</div>
+<script>
+const canvas=document.getElementById("wheel"),ctx=canvas.getContext("2d");
+const btn=document.getElementById("spin"),kind=document.getElementById("kind"),promptBox=document.getElementById("prompt"),icon=document.getElementById("icon"),extra=document.getElementById("extra");
+let audioCtx=null,spinSoundTimer=null;
+function audio(){if(!audioCtx){const AC=window.AudioContext||window.webkitAudioContext;if(AC)audioCtx=new AC();}if(audioCtx&&audioCtx.state==="suspended")audioCtx.resume();return audioCtx;}
+function tone(freq,duration,wave="sine",volume=.08,delay=0){const a=audio();if(!a)return;const o=a.createOscillator(),g=a.createGain();o.type=wave;o.frequency.setValueAtTime(freq,a.currentTime+delay);g.gain.setValueAtTime(.0001,a.currentTime+delay);g.gain.exponentialRampToValueAtTime(volume,a.currentTime+delay+.015);g.gain.exponentialRampToValueAtTime(.0001,a.currentTime+delay+duration);o.connect(g);g.connect(a.destination);o.start(a.currentTime+delay);o.stop(a.currentTime+delay+duration+.03);}
+function tick(){tone(720,.045,"square",.035);}
+function fanfare(){tone(523,.18,"triangle",.12);tone(659,.18,"triangle",.12,.16);tone(784,.32,"triangle",.13,.32);tone(1047,.48,"triangle",.14,.58);}
+function dramatic(){tone(392,.25,"sawtooth",.07);tone(370,.25,"sawtooth",.07,.28);tone(330,.65,"sawtooth",.09,.56);}
+const slices=[
+{label:"PREGUNTA",icon:"❔",color:"#ffd84d",type:"pregunta"},
+{label:"RETO",icon:"🌹",color:"#f05b9b",type:"reto"},
+{label:"PREGUNTA",icon:"❔",color:"#7bd8f5",type:"pregunta"},
+{label:"RETO",icon:"✨",color:"#9c75e8",type:"reto"},
+{label:"PREGUNTA",icon:"❔",color:"#ff9d45",type:"pregunta"},
+{label:"RETO",icon:"🌹",color:"#ed6b78",type:"reto"},
+{label:"PREGUNTA",icon:"❔",color:"#8edb9b",type:"pregunta"},
+{label:"RETO",icon:"✨",color:"#b58be9",type:"reto"}];
+const questions=[
+["¿En qué país nació Santa Teresita del Niño Jesús?","Francia."],
+["¿Cómo se conoce también a Santa Teresita?","Santa Teresita de Lisieux o Teresa del Niño Jesús."],
+["¿A qué congregación religiosa perteneció?","A las Carmelitas Descalzas."],
+["¿Qué flor se asocia especialmente con Santa Teresita?","La rosa."],
+["¿En qué ciudad francesa vivió en el convento?","Lisieux."],
+["¿Cómo se conoce su camino espiritual?","El caminito de la infancia espiritual."],
+["¿Qué virtud enseñaba mediante las pequeñas acciones?","El amor y la humildad."],
+["¿Cómo se llamaban sus padres?","Luis Martin y Celia Guérin."],
+["¿A qué edad ingresó al Carmelo?","A los 15 años."],
+["¿En qué fecha se celebra su fiesta?","El 1 de octubre."]];
+const challenges=[
+"Haz 5 sentadillas, a tu ritmo y sin forzarte.",
+"¡Baila La Pelusa durante 15 segundos!",
+"Da 5 vueltas sobre ti mismo, despacito y sin marearte.",
+"Haz 10 segundos de baile libre como si estuvieras en una fiesta.",
+"Imita a una persona famosa durante 10 segundos para que los demás adivinen.",
+"Canta el coro de una canción que todos conozcan.",
+"Camina como robot durante 15 segundos.",
+"Haz una pose divertida y mantenla durante 5 segundos.",
+"Di un trabalenguas sin equivocarte.",
+"Inventa un pasito de baile y enséñaselo al grupo."];
+let rotation=0,spinning=false;const arc=Math.PI*2/slices.length;
+function draw(){
+ const r=330;ctx.clearRect(0,0,700,700);ctx.save();ctx.translate(350,350);ctx.rotate(rotation);
+ slices.forEach((s,i)=>{const a=i*arc-Math.PI/2,b=a+arc;ctx.beginPath();ctx.moveTo(0,0);ctx.arc(0,0,r,a,b);ctx.closePath();ctx.fillStyle=s.color;ctx.fill();ctx.lineWidth=7;ctx.strokeStyle="#fff7e9";ctx.stroke();const m=a+arc/2;ctx.save();ctx.rotate(m);ctx.textAlign="center";ctx.fillStyle=s.type==="reto"?"#fffaf0":"#563522";ctx.font="bold 27px Trebuchet MS";ctx.fillText(s.label,0,-r*.68);ctx.font="42px Arial";ctx.fillText(s.icon,0,-r*.47);ctx.restore();});
+ ctx.beginPath();ctx.arc(0,0,r+8,0,Math.PI*2);ctx.lineWidth=15;ctx.strokeStyle="#8b5b31";ctx.stroke();ctx.restore();
+}
+draw();
+function spin(){
+ if(spinning)return;audio();spinning=true;btn.disabled=true;kind.textContent="GIRANDO…";promptBox.textContent="La suerte está decidiendo...";icon.textContent="🎡";extra.textContent="¡Un momento!";
+ let lastTick=0;spinSoundTimer=setInterval(()=>{if(!spinning){clearInterval(spinSoundTimer);return;}const now=performance.now();if(now-lastTick>95){tick();lastTick=now;}},95);
+ const chosen=Math.floor(Math.random()*slices.length),start=rotation;
+ const delta=Math.PI*2*(5+Math.random()*3)+(Math.PI*2-(chosen+.5)*arc),end=start+delta,duration=4200,t0=performance.now();
+ function frame(now){const p=Math.min((now-t0)/duration,1),ease=1-Math.pow(1-p,4);rotation=start+(end-start)*ease;draw();
+ if(p<1)requestAnimationFrame(frame);else{rotation%=Math.PI*2;draw();spinning=false;clearInterval(spinSoundTimer);const type=slices[chosen].type;icon.textContent=type==="pregunta"?"❔":"🌟";kind.textContent=type.toUpperCase();if(type==="pregunta"){fanfare();const q=questions[Math.floor(Math.random()*questions.length)];promptBox.textContent=q[0];extra.textContent="¡Responde en voz alta!";}else{dramatic();promptBox.textContent=challenges[Math.floor(Math.random()*challenges.length)];extra.textContent="¡Tú puedes! Cuando termines, continúa el juego.";}btn.disabled=false;}}
+ requestAnimationFrame(frame);
+}
+btn.addEventListener("click",spin);
+document.addEventListener("keydown",e=>{if(e.code==="Space"&&!e.repeat&&!["BUTTON","INPUT","TEXTAREA"].includes(document.activeElement.tagName)){e.preventDefault();spin();}});
+</script>
+</body></html>
